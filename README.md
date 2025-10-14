@@ -1,0 +1,1 @@
+# JuniorGO_Effective_Mobile
