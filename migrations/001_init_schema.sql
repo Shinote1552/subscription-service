@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXIST subscriptions(
+    id BIGSERIAL PRIMARY KEY,
+    service_name TEXT NOT NULL,
+    price BIGINT NOT NULL CHECK (price > 0)
+    user_id UUID NOT NULL,
+
+    start_date DATE NOT NULL,
+    end_date DATE NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
