@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// SubscriptionDB - DTO для работы с PostgreSQL
 type SubscriptionDB struct {
 	ID          int64
 	ServiceName string
@@ -19,7 +18,6 @@ type SubscriptionDB struct {
 	UpdatedAt   time.Time
 }
 
-// ToDomain конвертирует DB DTO в доменную модель
 func (d SubscriptionDB) ToDomain() models.Subscription {
 	return models.Subscription{
 		ID:          d.ID,
@@ -33,7 +31,6 @@ func (d SubscriptionDB) ToDomain() models.Subscription {
 	}
 }
 
-// FromDomain конвертирует доменную модель в DB DTO
 func FromDomain(domain models.Subscription) SubscriptionDB {
 	return SubscriptionDB{
 		ID:          domain.ID,
