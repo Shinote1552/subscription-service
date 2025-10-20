@@ -12,6 +12,8 @@ type SubscriptionRepository interface {
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]models.Subscription, error)
 	GetTotalPrice(ctx context.Context, userID, serviceName, startPeriod, endPeriod string) (int64, error)
+
+	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 type Service struct {

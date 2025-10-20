@@ -18,16 +18,16 @@ type SubscriptionDB struct {
 	UpdatedAt   time.Time
 }
 
-func (d SubscriptionDB) ToDomain() models.Subscription {
+func ToDomain(dto SubscriptionDB) models.Subscription {
 	return models.Subscription{
-		ID:          d.ID,
-		ServiceName: d.ServiceName,
-		Price:       d.Price,
-		UserID:      d.UserID,
-		StartDate:   d.StartDate,
-		EndDate:     d.EndDate,
-		CreatedAt:   d.CreatedAt,
-		UpdatedAt:   d.UpdatedAt,
+		ID:          dto.ID,
+		ServiceName: dto.ServiceName,
+		Price:       dto.Price,
+		UserID:      dto.UserID,
+		StartDate:   dto.StartDate,
+		EndDate:     dto.EndDate,
+		CreatedAt:   dto.CreatedAt,
+		UpdatedAt:   dto.UpdatedAt,
 	}
 }
 

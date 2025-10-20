@@ -1,6 +1,7 @@
 package create
 
 import (
+	"fmt"
 	"subscription-service/internal/domain/models"
 	"time"
 
@@ -14,15 +15,29 @@ type Request struct {
 	StartDate   string    `json:"start_date"`
 }
 
-func (r Request) ToDomain() models.Subscription {
-	startDate, _ := time.Parse("01-2006", r.StartDate)
+func ToDomain(subDTO Request) (models.Subscription, error) {
+	startDateStringed, err := time.Parse("01-2006`", subDTO.StartDate)
+	if err != nil {
+		return models.Subscription{}, fmt.Errorf("to domain converting: %w", err)
+	}
 
 	return models.Subscription{
-		ServiceName: r.ServiceName,
-		Price:       r.Price,
-		UserID:      r.UserID,
+			ServiceName: subDTO.ServiceName,
+			Price:       subDTO.Price,
+			UserID:      subDTO.UserID,
+			StartDate:   startDateStringed,
+		},
+		nil
+}
+
+func FromDomain(subDomain models.Subscription) Request {
+	startDate := subDomain.StartDate.Format(time.RFC3339)
+
+	return Request{
+		ServiceName: subDomain.ServiceName,
+		Price:       subDomain.Price,
+		UserID:      subDomain.UserID,
 		StartDate:   startDate,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
+
 }
