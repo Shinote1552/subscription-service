@@ -1,11 +1,11 @@
-package subscriptions
+package subscription
 
 import (
 	"context"
 	"subscription-service/internal/domain/models"
 )
 
-type SubscriptionRepository interface {
+type SubscriptionStorage interface {
 	Create(ctx context.Context, sub models.Subscription) (*models.Subscription, error)
 	GetByID(ctx context.Context, id int64) (*models.Subscription, error)
 	Update(ctx context.Context, sub models.Subscription) (*models.Subscription, error)
@@ -17,10 +17,10 @@ type SubscriptionRepository interface {
 }
 
 type Service struct {
-	db SubscriptionRepository
+	db SubscriptionStorage
 }
 
-func NewService(db SubscriptionRepository) *Service {
+func NewService(db SubscriptionStorage) *Service {
 	return &Service{
 		db: db,
 	}

@@ -3,11 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 	"subscription-service/internal/config"
+	"subscription-service/internal/http/handlers/subscriptionhand"
+	"subscription-service/internal/http/middlewares"
+	"subscription-service/internal/services/subscription"
 	"subscription-service/internal/storage"
+	"syscall"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
@@ -65,12 +72,81 @@ func main() {
 		Str("health_check_period", cfgMy.HealthCheckPeriod.String()).
 		Msg("Successfully connected to PostgreSQL")
 
-	// 6. Инициализация transaction manager
+	// 6. Инициализация transaction manager для pgx/v5
 	trManager := manager.Must(trmpgx.NewDefaultFactory(pool))
 	ctxGetter := trmpgx.DefaultCtxGetter
 
 	// 7. Инициализация зависимостей
-	storage := storage.NewStorage(pool, ctxGetter)
-	subscriptionService := subscriptions.NewService(storage, trManager)
+	subscriptionRepo := storage.NewStorage(pool, trManager, ctxGetter)
+	subscriptionService := subscription.NewService(subscriptionRepo)
 
+	// 8. Создание роутера и настройка маршрутов
+	router := mux.NewRouter()
+
+	// Global middlewares
+	router.Use(middlewares.Logger(logMy))
+	router.Use(middlewares.Compressor(logMy))
+	router.Use(middlewares.Recovery(logMy))
+
+	// Health check
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if err := pool.Ping(r.Context()); err != nil {
+			http.Error(w, "Database unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status": "healthy"}`))
+	}).Methods("GET")
+
+	// API routes
+	api := router.PathPrefix("/api/v1").Subrouter()
+
+	// Subscription routes (CRUDL + агрегация)
+	api.Handle("/subscription", subscriptionhand.Create(subscriptionService, logMy)).Methods("POST")         // Create
+	api.Handle("/subscription/{id}", subscriptionhand.Get(subscriptionService, logMy)).Methods("GET")        // Read
+	api.Handle("/subscription/{id}", subscriptionhand.Update(subscriptionService, logMy)).Methods("PUT")     // Update
+	api.Handle("/subscription/{id}", subscriptionhand.Delete(subscriptionService, logMy)).Methods("DELETE")  // Delete
+	api.Handle("/subscription", subscriptionhand.List(subscriptionService, logMy)).Methods("GET")            // List
+	api.Handle("/subscription/summary", subscriptionhand.Summary(subscriptionService, logMy)).Methods("GET") // Summary
+
+	// 9. Создание и настройка HTTP сервера
+	httpServer := &http.Server{
+		Addr:              ":" + cfgMy.HTTPPort,
+		Handler:           router,
+		ReadTimeout:       cfgMy.ReadTimeout,
+		WriteTimeout:      cfgMy.WriteTimeout,
+		IdleTimeout:       cfgMy.IdleTimeout,
+		ReadHeaderTimeout: cfgMy.ReadHeaderTimeout,
+	}
+
+	// 10. shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	// Запуск сервера
+	go func() {
+		logMy.Info().
+			Str("port", cfgMy.HTTPPort).
+			Dur("read_timeout", cfgMy.ReadTimeout).
+			Dur("write_timeout", cfgMy.WriteTimeout).
+			Msg("Starting HTTP server")
+
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logMy.Fatal().Err(err).Msg("Server failed to start")
+		}
+	}()
+
+	// Ожидание сигнала завершения
+	sig := <-stop
+	logMy.Info().Str("signal", sig.String()).Msg("Received signal, shutting down server...")
+
+	// shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(ctxRoot, 30*time.Second)
+	defer shutdownCancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		logMy.Error().Err(err).Msg("Server shutdown error")
+	} else {
+		logMy.Info().Msg("Server shutdown completed successfully")
+	}
 }
